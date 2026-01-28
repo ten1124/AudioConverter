@@ -30,6 +30,7 @@ jobs:
           mkdir -p "$dmg_src"
           cp -R dist/AudioConverter.app "$dmg_src/"
           cp "起動前に.txt" "$dmg_src/"
+          ln -s /Applications "$dmg_src/Applications"
           hdiutil create -volname "AudioConverter" -srcfolder "$dmg_src" -ov -format UDZO dist/AudioConverter-macos.dmg
 
       - name: Build (Windows)
