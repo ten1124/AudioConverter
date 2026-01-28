@@ -1,4 +1,4 @@
-# AudioConverter
+<!-- dummy --># AudioConverter
 
 [![Release](https://img.shields.io/github/v/release/ten1124/AudioConverter)](https://github.com/ten1124/AudioConverter/releases)[![Build](https://github.com/ten1124/AudioConverter/actions/workflows/build.yml/badge.svg)](https://github.com/ten1124/AudioConverter/actions/workflows/build.yml)![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
