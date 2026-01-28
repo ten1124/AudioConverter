@@ -5,6 +5,6 @@ set -euo pipefail
 python3 -m pip install --upgrade pip
 python3 -m pip install pyinstaller tkinterdnd2
 
-python3 -m PyInstaller --windowed --name AudioConverter app.py
+python3 -m PyInstaller --windowed --name AudioConverter --add-data "LICENSES:LICENSES" app.py
 
 echo "Done. Output: dist/AudioConverter.app"

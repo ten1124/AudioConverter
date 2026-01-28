@@ -476,8 +476,8 @@ class App(BASE_TK):
         ttk.Button(footer, text="OK", command=win.destroy).pack(side=tk.RIGHT)
 
     def open_licenses(self):
-        root_dir = os.path.dirname(os.path.abspath(__file__))
-        license_path = os.path.join(root_dir, "LICENSES", "THIRD_PARTY_NOTICES.md")
+        base_dir = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        license_path = os.path.join(base_dir, "LICENSES", "THIRD_PARTY_NOTICES.md")
         if not os.path.isfile(license_path):
             messagebox.showerror("ライセンス", "ライセンス情報が見つかりません。")
             return
