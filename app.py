@@ -5,6 +5,7 @@ import subprocess
 import threading
 import tkinter as tk
 import sys
+import webbrowser
 from datetime import datetime
 from tkinter import filedialog, messagebox, ttk
 
@@ -69,17 +70,72 @@ FORMATS = {
     },
 }
 
+APP_VERSION = "0.1"
 SOURCE_VALUE = "ソース一致"
+FORCE_MISSING_FFMPEG = False
+FFMPEG_PATH = None
+FORCE_PLATFORM = None
 
 
 def which_ffmpeg():
+    if FORCE_MISSING_FFMPEG:
+        return None
+    if FFMPEG_PATH and os.path.isfile(FFMPEG_PATH):
+        return FFMPEG_PATH
     exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
     return shutil.which(exe)
 
 
 def which_ffprobe():
+    if FFMPEG_PATH:
+        base_dir = os.path.dirname(FFMPEG_PATH)
+        exe = "ffprobe.exe" if os.name == "nt" else "ffprobe"
+        candidate = os.path.join(base_dir, exe)
+        if os.path.isfile(candidate):
+            return candidate
     exe = "ffprobe.exe" if os.name == "nt" else "ffprobe"
     return shutil.which(exe)
+
+def set_ffmpeg_path(path):
+    global FFMPEG_PATH
+    if path and os.path.isfile(path):
+        FFMPEG_PATH = path
+        dir_path = os.path.dirname(path)
+        os.environ["PATH"] = dir_path + os.pathsep + os.environ.get("PATH", "")
+        return True
+    return False
+
+def find_ffmpeg_in_common_paths():
+    candidates = []
+    platform = FORCE_PLATFORM or sys.platform
+    if platform.startswith("win"):
+        candidates += [
+            r"C:\ffmpeg\bin\ffmpeg.exe",
+            r"C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+            r"C:\Program Files (x86)\ffmpeg\bin\ffmpeg.exe",
+        ]
+    elif platform == "darwin":
+        candidates += [
+            "/opt/homebrew/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+        ]
+    else:
+        candidates += [
+            "/usr/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+        ]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    return None
+
+def ffmpeg_download_url():
+    platform = FORCE_PLATFORM or sys.platform
+    if platform.startswith("win"):
+        return "https://www.gyan.dev/ffmpeg/builds/"
+    if platform == "darwin":
+        return "https://ffmpeg.org/download.html#build-mac"
+    return "https://ffmpeg.org/download.html#build-linux"
 
 
 def safe_stem(path):
@@ -87,6 +143,12 @@ def safe_stem(path):
     if "." in base:
         return ".".join(base.split(".")[:-1])
     return base
+
+
+ABOUT_DESCRIPTION = (
+    "FFmpeg を使って音声ファイルを WAV や主要コーデックへ変換するツールです。"
+    "\nバッチ/シェルの簡易変換と、GUI アプリ (Python/Tkinter) を含みます。"
+)
 
 
 def parse_float(value):
@@ -104,6 +166,7 @@ def ensure_dir(path):
 class App(BASE_TK):
     def __init__(self):
         super().__init__()
+        self.withdraw()
         self.title("音声変換")
         self.geometry("900x700")
         self.minsize(720, 560)
@@ -114,7 +177,9 @@ class App(BASE_TK):
         self.option_rows = {}
         self.option_visible = {}
         self.option_reset = {}
+        self.ffmpeg_status = tk.StringVar(value="FFmpeg: 確認中...")
 
+        self._build_menu()
         self._build_ui()
         self._poll_log()
 
@@ -130,6 +195,10 @@ class App(BASE_TK):
         if DND_AVAILABLE:
             self.listbox.drop_target_register(DND_FILES)
             self.listbox.dnd_bind("<<Drop>>", self.on_drop)
+            self.empty_hint = ttk.Label(
+                file_frame, text="ドラッグ&ドロップ可能", foreground="#777777"
+            )
+            self.update_empty_hint()
         else:
             ttk.Label(
                 file_frame,
@@ -218,9 +287,9 @@ class App(BASE_TK):
         )
         self.open_out_btn.pack(side=tk.LEFT, padx=(8, 0))
 
-        ttk.Button(action_frame, text="表示設定", command=self.open_visibility_settings).pack(
-            side=tk.RIGHT
-        )
+        status_frame = ttk.Frame(main)
+        status_frame.pack(fill=tk.X, pady=(6, 0))
+        ttk.Label(status_frame, textvariable=self.ffmpeg_status).pack(side=tk.LEFT)
 
         notebook = ttk.Notebook(main)
         notebook.pack(fill=tk.BOTH, expand=True, pady=(10, 0))
@@ -241,6 +310,270 @@ class App(BASE_TK):
 
         self.on_format_change()
         self.on_output_mode_change()
+        self._startup_check()
+
+    def _startup_check(self):
+        ok = self.check_ffmpeg(show_message=False, exit_on_missing=False, allow_pick=False)
+        if ok:
+            self.deiconify()
+            return True
+        self.show_ffmpeg_onboarding()
+        return False
+
+    def _build_menu(self):
+        menubar = tk.Menu(self)
+
+        settings_menu = tk.Menu(menubar, tearoff=0)
+        settings_menu.add_command(label="表示設定", command=self.open_visibility_settings)
+        menubar.add_cascade(label="設定", menu=settings_menu)
+
+        ffmpeg_menu = tk.Menu(menubar, tearoff=0)
+        ffmpeg_menu.add_command(label="FFmpegチェック", command=self.check_ffmpeg)
+        ffmpeg_menu.add_command(label="FFmpeg path指定", command=self.pick_ffmpeg)
+        menubar.add_cascade(label="FFmpeg", menu=ffmpeg_menu)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="バージョン情報", command=self.open_about)
+        menubar.add_cascade(label="ヘルプ", menu=help_menu)
+
+        self.config(menu=menubar)
+
+    def pick_ffmpeg(self, show_message=True):
+        initial = os.path.dirname(FFMPEG_PATH) if FFMPEG_PATH else None
+        filename = filedialog.askopenfilename(
+            title="ffmpeg を選択",
+            initialdir=initial,
+            filetypes=[("ffmpeg", "ffmpeg*"), ("All files", "*.*")],
+        )
+        if filename and set_ffmpeg_path(filename):
+            self.ffmpeg_status.set("FFmpeg: OK")
+            if show_message:
+                messagebox.showinfo("FFmpeg", f"OK: {filename}")
+            return True
+        if filename:
+            if show_message:
+                messagebox.showerror("FFmpeg", "ffmpeg を確認できませんでした。")
+        return False
+
+    def show_ffmpeg_onboarding(self):
+        win = tk.Toplevel(self)
+        win.title("FFmpeg セットアップ")
+        win.resizable(False, False)
+        win.grab_set()
+
+        frame = ttk.Frame(win, padding=16)
+        frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(
+            frame,
+            text="FFmpeg が見つかりません。",
+            font=("TkDefaultFont", 12, "bold"),
+        ).pack(anchor="w")
+        platform = FORCE_PLATFORM or sys.platform
+        if platform == "darwin":
+            info_text = (
+                "macOS では Homebrew による FFmpeg インストールを推奨しています。\n"
+                "すでにインストール済みの場合は場所を指定してください。"
+            )
+        else:
+            info_text = (
+                "OS に合わせてダウンロードしてください。\n"
+                "すでにインストール済みの場合は場所を指定してください。"
+            )
+        ttk.Label(frame, text=info_text).pack(anchor="w", pady=(6, 0))
+
+        btns = ttk.Frame(frame)
+        btns.pack(fill=tk.X, pady=(12, 0))
+
+        download_frame = ttk.Frame(frame)
+        download_frame.pack(fill=tk.X, pady=(8, 0))
+
+        def open_url(url):
+            webbrowser.open(url)
+
+        def on_download():
+            self.destroy()
+
+        def on_pick():
+            if self.pick_ffmpeg(show_message=False):
+                self.deiconify()
+                win.destroy()
+                return
+            messagebox.showerror("FFmpeg", "ffmpeg を確認できませんでした。")
+
+        def on_quit():
+            self.destroy()
+
+        ttk.Label(download_frame, text="ダウンロード:").pack(side=tk.LEFT)
+        if platform.startswith("win"):
+            ttk.Button(
+                download_frame,
+                text="Windows",
+                command=lambda: open_url("https://www.gyan.dev/ffmpeg/builds/"),
+            ).pack(side=tk.LEFT, padx=(8, 0))
+        elif platform == "darwin":
+            ttk.Button(
+                download_frame,
+                text="Homebrew",
+                command=lambda: open_url("https://brew.sh/"),
+            ).pack(side=tk.LEFT, padx=(8, 0))
+            ttk.Button(
+                download_frame,
+                text="FFmpeg公式",
+                command=lambda: open_url("https://ffmpeg.org/download.html#build-mac"),
+            ).pack(side=tk.LEFT, padx=(8, 0))
+        else:
+            ttk.Button(
+                download_frame,
+                text="Linux",
+                command=lambda: open_url("https://ffmpeg.org/download.html#build-linux"),
+            ).pack(side=tk.LEFT, padx=(8, 0))
+
+        ttk.Button(btns, text="場所を指定", command=on_pick).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
+        ttk.Button(btns, text="閉じる", command=on_quit).pack(side=tk.RIGHT)
+
+        win.protocol("WM_DELETE_WINDOW", on_quit)
+
+    def open_about(self):
+        win = tk.Toplevel(self)
+        win.title("バージョン情報")
+        win.geometry("520x320")
+        win.minsize(480, 280)
+
+        outer = ttk.Frame(win, padding=16)
+        outer.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(outer, text="AudioConverter", font=("TkDefaultFont", 18, "bold")).pack(
+            anchor="w"
+        )
+        ttk.Label(
+            outer,
+            text=f"Version {APP_VERSION}",
+            foreground="#555555",
+        ).pack(anchor="w", pady=(4, 0))
+
+        ttk.Separator(outer, orient="horizontal").pack(fill=tk.X, pady=10)
+
+        ttk.Label(
+            outer,
+            text=ABOUT_DESCRIPTION,
+            wraplength=460,
+            justify="left",
+        ).pack(anchor="w")
+
+        footer = ttk.Frame(outer)
+        footer.pack(fill=tk.X, pady=(18, 0))
+        ttk.Button(footer, text="ライセンス表示", command=self.open_licenses).pack(
+            side=tk.LEFT
+        )
+        ttk.Button(footer, text="OK", command=win.destroy).pack(side=tk.RIGHT)
+
+    def open_licenses(self):
+        root_dir = os.path.dirname(os.path.abspath(__file__))
+        license_path = os.path.join(root_dir, "LICENSES", "THIRD_PARTY_NOTICES.md")
+        if not os.path.isfile(license_path):
+            messagebox.showerror("ライセンス", "ライセンス情報が見つかりません。")
+            return
+        try:
+            with open(license_path, "r", encoding="utf-8") as f:
+                raw = f.read()
+        except Exception:
+            messagebox.showerror("ライセンス", "ライセンス情報を読み込めませんでした。")
+            return
+        lines = []
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                stripped = stripped.lstrip("#").strip()
+                if stripped:
+                    lines.append(stripped)
+                    lines.append("")
+                continue
+            if stripped.startswith("- "):
+                stripped = "• " + stripped[2:]
+            if stripped:
+                lines.append(stripped)
+            else:
+                lines.append("")
+        content = "\n".join(lines).strip()
+
+        win = tk.Toplevel(self)
+        win.title("ライセンス")
+        win.geometry("760x540")
+        win.minsize(640, 420)
+        win.resizable(True, True)
+        win.maxsize(win.winfo_screenwidth(), win.winfo_screenheight())
+
+        outer = ttk.Frame(win, padding=12)
+        outer.pack(fill=tk.BOTH, expand=True)
+
+        header = ttk.Frame(outer)
+        header.pack(fill=tk.X)
+        ttk.Label(header, text="AudioConverter", font=("TkDefaultFont", 16, "bold")).pack(
+            anchor="w"
+        )
+        ttk.Label(
+            header,
+            text="Third-Party Notices",
+            foreground="#555555",
+        ).pack(anchor="w", pady=(2, 0))
+        ttk.Separator(outer, orient="horizontal").pack(fill=tk.X, pady=8)
+
+        text_frame = ttk.Frame(outer)
+        text_frame.pack(fill=tk.BOTH, expand=True)
+
+        text = tk.Text(text_frame, wrap="word", height=18)
+        text.insert(tk.END, content)
+        text.configure(state=tk.DISABLED)
+        text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=text.yview)
+
+        def update_scrollbar(first, last):
+            first_f = float(first)
+            last_f = float(last)
+            if first_f <= 0.0 and last_f >= 1.0:
+                scrollbar.pack_forget()
+            else:
+                if not scrollbar.winfo_ismapped():
+                    scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            scrollbar.set(first, last)
+
+        text.configure(yscrollcommand=update_scrollbar)
+        update_scrollbar(*text.yview())
+
+        footer = ttk.Frame(outer)
+        footer.pack(fill=tk.X, pady=(10, 0))
+        ttk.Button(footer, text="OK", command=win.destroy).pack(side=tk.RIGHT)
+
+    def check_ffmpeg(self, show_message=True, exit_on_missing=False, allow_pick=False):
+        path = which_ffmpeg()
+        if path:
+            self.ffmpeg_status.set("FFmpeg: OK")
+            if show_message:
+                messagebox.showinfo("FFmpeg", f"OK: {path}")
+            return True
+        auto = find_ffmpeg_in_common_paths()
+        if auto and set_ffmpeg_path(auto):
+            self.ffmpeg_status.set("FFmpeg: OK")
+            if show_message:
+                messagebox.showinfo("FFmpeg", f"OK: {auto}")
+            return True
+        self.ffmpeg_status.set("FFmpeg: 見つかりません")
+        if show_message:
+            if allow_pick:
+                if self.pick_ffmpeg():
+                    return True
+            if messagebox.askyesno(
+                "ffmpeg が見つかりません",
+                "FFmpeg が見つかりません。\nインストールしてからアプリを起動してください。\n\nダウンロードページを開きますか？",
+            ):
+                webbrowser.open(ffmpeg_download_url())
+            if exit_on_missing:
+                self.destroy()
+        return False
 
     def _build_options(self, parent):
         canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
@@ -683,12 +1016,14 @@ class App(BASE_TK):
         for path in paths:
             if os.path.isfile(path):
                 self._add_file(path)
+        self.update_empty_hint()
         return "break"
 
     def _add_file(self, path):
         if path not in self.files:
             self.files.append(path)
             self.listbox.insert(tk.END, path)
+        self.update_empty_hint()
 
     def remove_selected(self):
         selected = list(self.listbox.curselection())
@@ -697,10 +1032,20 @@ class App(BASE_TK):
         for idx in reversed(selected):
             self.listbox.delete(idx)
             del self.files[idx]
+        self.update_empty_hint()
 
     def clear_files(self):
         self.listbox.delete(0, tk.END)
         self.files = []
+        self.update_empty_hint()
+
+    def update_empty_hint(self):
+        if not hasattr(self, "empty_hint"):
+            return
+        if self.files:
+            self.empty_hint.place_forget()
+        else:
+            self.empty_hint.place(relx=0.5, rely=0.5, anchor="center")
 
     def pick_out_dir(self):
         path = filedialog.askdirectory(title="出力フォルダを選択")
@@ -796,11 +1141,7 @@ class App(BASE_TK):
             if not subdir:
                 messagebox.showwarning("出力先", "サブフォルダ名を入力してください。")
                 return
-        if not which_ffmpeg():
-            messagebox.showerror(
-                "ffmpeg が見つかりません",
-                "PATH に ffmpeg が見つかりません。インストールして再度お試しください。",
-            )
+        if not self.check_ffmpeg(show_message=True):
             return
 
         self.convert_btn.configure(state="disabled")
@@ -1091,6 +1432,8 @@ class App(BASE_TK):
             "default=nw=1",
             path,
         ]
+        if not cmd[0]:
+            return
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if result.returncode == 0:
             for line in result.stdout.strip().splitlines():
@@ -1098,5 +1441,13 @@ class App(BASE_TK):
 
 
 if __name__ == "__main__":
+    if "--test-no-ffmpeg" in sys.argv:
+        FORCE_MISSING_FFMPEG = True
+    if "--test-mac" in sys.argv:
+        FORCE_PLATFORM = "darwin"
+    if "--test-linux" in sys.argv:
+        FORCE_PLATFORM = "linux"
+    if "--test-win" in sys.argv:
+        FORCE_PLATFORM = "win32"
     app = App()
     app.mainloop()

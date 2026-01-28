@@ -2,9 +2,9 @@
 setlocal enabledelayedexpansion
 
 if "%~1"=="" (
-  echo Usage: any_to_audio.bat input_file [format]
+  echo Usage: audio_converter.bat input_file [format]
   echo   format: wav ^| mp3 ^| m4a ^| aac ^| flac ^| opus ^| ogg
-  echo Example: any_to_audio.bat input.mp3 wav
+  echo Example: audio_converter.bat input.mp3 wav
   exit /b 1
 )
 
@@ -31,6 +31,11 @@ if "%CODEC%"=="" (
 set "OUT=%~dpn1.%EXT%"
 
 echo Converting: "%INPUT%" -> "%OUT%" (%FORMAT%)
+where ffmpeg >nul 2>nul
+if errorlevel 1 (
+  echo ffmpeg が見つかりません。PATH に追加して再度お試しください。
+  exit /b 1
+)
 ffmpeg -y -i "%INPUT%" -c:a %CODEC% "%OUT%"
 
 if errorlevel 1 (

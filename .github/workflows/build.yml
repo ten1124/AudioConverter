@@ -25,7 +25,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           python3 -m pip install pyinstaller
-          python3 -m PyInstaller --windowed --name AnyToAudio app.py
+          python3 -m PyInstaller --windowed --name AudioConverter app.py
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
@@ -33,18 +33,18 @@ jobs:
         run: |
           py -m pip install --upgrade pip
           py -m pip install pyinstaller
-          py -m PyInstaller --noconsole --onefile --name AnyToAudio app.py
+          py -m PyInstaller --noconsole --onefile --name AudioConverter app.py
 
       - name: Upload artifact (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: AnyToAudio-macos
-          path: dist/AnyToAudio.app
+          name: AudioConverter-macos
+          path: dist/AudioConverter.app
 
       - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: AnyToAudio-windows
-          path: dist/AnyToAudio.exe
+          name: AudioConverter-windows
+          path: dist/AudioConverter.exe

@@ -13,7 +13,7 @@ venv/
 .env/
 
 # PyInstaller
-build/AnyToAudio/
+build/AudioConverter/
 dist/
 
 # Tool caches

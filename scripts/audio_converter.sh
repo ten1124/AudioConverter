@@ -2,9 +2,9 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: any_to_audio.sh input_file [format]"
+  echo "Usage: audio_converter.sh input_file [format]"
   echo "  format: wav | mp3 | m4a | aac | flac | opus | ogg"
-  echo "Example: any_to_audio.sh input.mp3 wav"
+  echo "Example: audio_converter.sh input.mp3 wav"
   exit 1
 fi
 
@@ -31,6 +31,10 @@ case "${format,,}" in
 out="${input%.*}.${ext}"
 
 echo "Converting: ${input} -> ${out} (${format})"
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "ffmpeg が見つかりません。PATH に追加して再度お試しください。"
+  exit 1
+fi
 ffmpeg -y -i "${input}" -c:a "${codec}" "${out}"
 
 echo "Done."
