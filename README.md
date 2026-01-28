@@ -1,6 +1,6 @@
 # AudioConverter
 
-[![Build](https://github.com/ten1124/AudioConverter/actions/workflows/build.yml/badge.svg)](https://github.com/ten1124/AudioConverter/actions/workflows/build.yml)![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
+[![Release](https://img.shields.io/github/v/release/ten1124/AudioConverter)](https://github.com/ten1124/AudioConverter/releases)[![Build](https://github.com/ten1124/AudioConverter/actions/workflows/build.yml/badge.svg)](https://github.com/ten1124/AudioConverter/actions/workflows/build.yml)![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
 FFmpeg を使って音声ファイルを WAV や主要コーデックへ変換するツールです。  
 バッチ/シェルの簡易変換と、GUI アプリ (Python/Tkinter) を含みます。
@@ -14,7 +14,8 @@ FFmpeg を使って音声ファイルを WAV や主要コーデックへ変換�
 ## For Users
 ### Install
 - GitHub Releases から OS に合ったビルド済みファイルをダウンロードしてください
-- Releases: 
+- Releases: [![Release](https://img.shields.io/github/v/release/ten1124/AudioConverter)](https://github.com/ten1124/AudioConverter/releases)
+
 ### Requirements
 - FFmpeg（初回起動時に自動チェックされ、未インストールの場合は OS 別のインストールページが開きます）
   - 手動でインストールする場合は `https://ffmpeg.org/download.html` を参照してくださいS
