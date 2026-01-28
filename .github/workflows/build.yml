@@ -24,7 +24,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install pyinstaller
+          python3 -m pip install pyinstaller tkinterdnd2
           python3 -m PyInstaller --windowed --name AudioConverter app.py
 
       - name: Build (Windows)
@@ -32,7 +32,7 @@ jobs:
         shell: pwsh
         run: |
           py -m pip install --upgrade pip
-          py -m pip install pyinstaller
+          py -m pip install pyinstaller tkinterdnd2
           py -m PyInstaller --noconsole --onefile --name AudioConverter app.py
 
       - name: Upload artifact (macOS)
