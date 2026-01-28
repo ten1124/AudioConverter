@@ -26,13 +26,13 @@ jobs:
           python3 -m pip install pyinstaller tkinterdnd2
           python3 -m PyInstaller --windowed --name AudioConverter app.py
           npm install -g create-dmg
-          workspace_dir="$(pwd)"
-          rm -rf "$workspace_dir/dist/dmg" "$workspace_dir/dist/dmg-src"
-          mkdir -p "$workspace_dir/dist/dmg-src"
-          cp -R "$workspace_dir/dist/AudioConverter.app" "$workspace_dir/dist/dmg-src/"
-          cp "$workspace_dir/起動前に.txt" "$workspace_dir/dist/dmg-src/"
-          test -d "$workspace_dir/dist/dmg-src"
-          create-dmg --volname "AudioConverter" "$workspace_dir/dist/dmg-src" "$workspace_dir/dist/AudioConverter-macos.dmg"
+          dmg_src="$RUNNER_TEMP/dmg-src"
+          rm -rf "$dmg_src"
+          mkdir -p "$dmg_src"
+          cp -R dist/AudioConverter.app "$dmg_src/"
+          cp "起動前に.txt" "$dmg_src/"
+          test -d "$dmg_src"
+          create-dmg --volname "AudioConverter" "$dmg_src" "dist/AudioConverter-macos.dmg"
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
