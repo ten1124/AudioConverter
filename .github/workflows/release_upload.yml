@@ -33,14 +33,12 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install pyinstaller tkinterdnd2
           python3 -m PyInstaller --windowed --name AudioConverter app.py
-          npm install -g create-dmg
           dmg_src="$RUNNER_TEMP/dmg-src"
           rm -rf "$dmg_src"
           mkdir -p "$dmg_src"
           cp -R dist/AudioConverter.app "$dmg_src/"
           cp "起動前に.txt" "$dmg_src/"
-          test -d "$dmg_src"
-          create-dmg --volname "AudioConverter" "$dmg_src" "dist/AudioConverter-macos.dmg"
+          hdiutil create -volname "AudioConverter" -srcfolder "$dmg_src" -ov -format UDZO dist/AudioConverter-macos.dmg
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
