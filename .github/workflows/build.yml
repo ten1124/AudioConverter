@@ -25,8 +25,15 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install pyinstaller tkinterdnd2
           python3 -m PyInstaller --windowed --name AudioConverter app.py
-          cd dist
-          zip -r AudioConverter-macos.zip AudioConverter.app
+          npm install -g create-dmg
+          create-dmg \
+            --volname "AudioConverter" \
+            --window-size 700 400 \
+            --icon-size 120 \
+            --app-drop-link 520 200 \
+            --add-file "起動前に.txt" "起動前に.txt" 160 200 \
+            "dist/AudioConverter.app" \
+            "dist/AudioConverter-macos.dmg"
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
@@ -41,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: AudioConverter-macos
-          path: dist/AudioConverter-macos.zip
+          path: dist/AudioConverter-macos.dmg
 
       - name: Upload artifact (Windows)
         if: runner.os == 'Windows'

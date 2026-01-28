@@ -1,0 +1,6 @@
+macOS では初回起動時に「開けません」と表示される場合があります（未署名アプリのため）。
+
+【起動方法】
+1) Finderで AudioConverter.app を右クリック →「開く」→ もう一度「開く」
+2) それでも起動できない場合はターミナルで以下を実行してください：
+   sudo xattr -dr com.apple.quarantine "/Applications/AudioConverter.app"
