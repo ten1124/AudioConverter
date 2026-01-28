@@ -453,6 +453,11 @@ class App(BASE_TK):
             text=f"Version {APP_VERSION}",
             foreground="#555555",
         ).pack(anchor="w", pady=(4, 0))
+        ttk.Label(
+            outer,
+            text="License: MIT",
+            foreground="#555555",
+        ).pack(anchor="w")
 
         ttk.Separator(outer, orient="horizontal").pack(fill=tk.X, pady=10)
 
